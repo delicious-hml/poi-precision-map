@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>深圳市高校分布图 · 逐点精标</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; background:#0e1116; color:#e6e6e6; }
+  #app { display: flex; height: 100vh; }
+  #map { flex: 1; height: 100%; background:#1a1f27; }
+  #panel { width: 340px; min-width: 340px; height: 100%; overflow-y: auto; background:#151a22; border-left: 1px solid #2a3441; }
+  .hdr { padding: 14px 16px 10px; border-bottom: 1px solid #2a3441; }
+  .hdr h1 { font-size: 16px; margin: 0 0 6px; color:#fff; }
+  .hdr .sub { font-size: 12px; color:#9aa7b5; line-height: 1.5; }
+  .hdr .asof { font-size: 11px; color:#7e8a98; margin-top: 4px; }
+  .counts { display:flex; gap:8px; margin-top:10px; }
+  .chip { flex:1; text-align:center; border-radius:8px; padding:8px 4px; font-size:12px; background:rgba(30,64,175,.18); color:#9cc0ff; border:1px solid #1e40af; }
+  .chip b { display:block; font-size:20px; margin-bottom:2px; }
+  .btns { display:flex; gap:6px; padding:10px 16px; flex-wrap:wrap; border-bottom:1px solid #2a3441; }
+  .btns button { flex:1; min-width:80px; cursor:pointer; background:#1f2733; color:#cdd6e0; border:1px solid #34404f; border-radius:6px; padding:7px 4px; font-size:12px; }
+  .btns button:hover { background:#283242; }
+  .search { padding:10px 16px 0; }
+  .search input { width:100%; background:#1f2733; color:#e6e6e6; border:1px solid #34404f; border-radius:6px; padding:7px 10px; font-size:12px; outline:none; }
+  .search input:focus { border-color:#1e40af; }
+  .grp-title { padding:10px 16px 4px; font-size:12px; color:#9aa7b5; font-weight:600; }
+  .item { padding:9px 16px; border-bottom:1px solid #202833; cursor:pointer; display:flex; gap:10px; align-items:flex-start; }
+  .item:hover { background:#1c2430; }
+  .item.hidden { display:none; }
+  .num { flex:none; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; }
+  .nm { font-size:13px; color:#eef2f6; font-weight:600; }
+  .ct { font-size:10px; color:#9cc0ff; margin-left:6px; }
+  .ad { font-size:11px; color:#9aa7b5; line-height:1.45; margin-top:2px; }
+  .dsc { font-size:11px; color:#c2ccd8; line-height:1.45; margin-top:3px; }
+  .tag { font-size:10px; margin-top:3px; display:inline-block; padding:1px 6px; border-radius:4px; background:rgba(46,125,50,.2); color:#7fd18a; }
+  .tag.warn { background:rgba(255,107,53,.2); color:#ff9b6b; }
+  .tag.status { background:rgba(9,105,218,.18); color:#79b8ff; margin-left:4px; }
+  .legend { padding:10px 16px; font-size:11px; color:#9aa7b5; border-top:1px solid #2a3441; }
+  .legend .row { display:flex; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap; }
+  .dot { width:12px; height:12px; border-radius:50%; flex:none; }
+  .pin { font-size: 11px; font-weight:700; color:#fff; width:26px; height:26px; line-height:22px; text-align:center; border-radius:50% 50% 50% 0; transform: rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.5); }
+  .pin span { transform: rotate(45deg); display:inline-block; }
+  .pop b { font-size:14px; color:#111; }
+  .pop .desc { font-size:12px; color:#444; margin:4px 0 0; line-height:1.5; }
+  .pop .meta { font-size:12px; color:#333; margin-top:4px; line-height:1.5; }
+  .pop .conf { font-size:11px; margin-top:6px; padding:3px 6px; border-radius:4px; display:inline-block; background:#e6f4ea; color:#1b5e20; }
+  .pop .conf.warn { background:#fdeede; color:#b34700; }
+  .note { padding:10px 16px; font-size:11px; color:#7e8a98; line-height:1.6; border-top:1px solid #2a3441; }
+  @media (max-width: 640px){
+    #app { flex-direction: column; }
+    #panel { width:100%; min-width:0; max-height:45vh; border-left:none; border-top:1px solid #2a3441; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+  <div id="panel">
+    <div class="hdr">
+      <h1 id="ui-title">{region} {category} Precision Map</h1>
+      <div class="sub" id="ui-sub">Point-by-point by actual address. Rigorous counting: no omissions, no redundancy.</div>
+      <div class="asof" id="ui-asof"></div>
+      <div class="asof" id="ui-rankedby" style="display:none"></div>
+      <div class="asof" id="ui-catdef" style="display:none"></div>
+      <div class="counts">
+        <div class="chip"><b id="cTot">0</b><span id="ui-total">Total</span></div>
+      </div>
+    </div>
+    <div class="btns">
+      <button id="ui-fitall" onclick="fitAll()">Fit All</button>
+      <button id="ui-export" onclick="exportCSV()">Export CSV</button>
+    </div>
+    <div class="search"><input id="search" type="text" placeholder="Search name / address / category..." oninput="filterList()" /></div>
+    <div class="grp-title" id="ui-listtitle">Places</div>
+    <div id="list"></div>
+    <div class="legend" id="legend"></div>
+    <div class="note" id="ui-note">Sources: category-specific authoritative sources, cross-verified. Coordinates are GCJ-02; co-located places nudged to avoid overlap.</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- ===== DATA_INJECT_START — replace with REAL verified data only. NO placeholders, NO demos. =====
+     Rules (see SKILL.md "Template Discipline"):
+     - Do NOT rewrite this HTML file's structure. Only replace: (a) the UI strings object below,
+       (b) META.asof, (c) the contents of this <script> block. Feature gaps go in an extension
+       block AFTER the existing script — never delete or rewrite the popup/list/legend logic.
+     - Standard JSON (double-quoted keys). Fields: id (int), name, cat, addr, lat, lng, conf.
+       Optional: desc (one-line intro shown in popup + side list), status (营业中/已关闭/在建...), src (source label).
+     - conf closed set: 高 / 中 / 低 (or High / Medium / Low). 低/Low renders as warning. Optional ⚠ prefix.
+     - lat/lng MUST be GCJ-02 coordinates (Amap tiles). Convert WGS-84 / BD-09 first.
+     - Points that could not be precisely geocoded do NOT go in this array; list them in the delivery note instead.
+     - Set META.asof to the data capture date (YYYY-MM-DD).
+     - For "top N" tasks, ALSO set META.rankedBy (the ordering metric, e.g. "规模/注册资本")
+       and META.catDef (the category inclusion rule, e.g. "含 MCU 与工控，不含纯软件外包").
+       These render in the header so two runs with the same spec stay comparable. Do not leave sample rows.
+     - The popup template below references UI.addr / UI.coord / UI.status / UI.src and c.conf.
+       These placeholders are FROZEN — removing any of them silently drops a required field and
+       will be flagged by validate.py. Empty values render as blank lines, that is fine. -->
+<script id="places-data" type="application/json">[{"id":1,"name":"深圳大学","cat":"本地高校","addr":"广东省深圳市南山区南海大道3688号（粤海校区）","lat":22.532868,"lng":113.93634,"conf":"高","status":"办学中","desc":"1983年建校的特区综合性大学","src":"官网 + OSM"},{"id":2,"name":"南方科技大学","cat":"本地高校","addr":"广东省深圳市南山区学苑大道1088号","lat":22.597678,"lng":113.999707,"conf":"高","status":"办学中","desc":"2011年创办的新型研究型大学","src":"官网 + 维基百科"},{"id":3,"name":"哈尔滨工业大学（深圳）","cat":"异地校区","addr":"广东省深圳市南山区桃源街道深圳大学城哈工大校区","lat":22.58654,"lng":113.970627,"conf":"高","status":"办学中","desc":"C9高校在深圳的异地校区","src":"官网 + OSM"},{"id":4,"name":"清华大学深圳国际研究生院","cat":"异地校区","addr":"广东省深圳市南山区西丽大学城清华园区","lat":22.591996,"lng":113.969316,"conf":"高","status":"办学中","desc":"清华在深圳的研究生培养基地","src":"官网 + OSM"},{"id":5,"name":"北京大学深圳研究生院","cat":"异地校区","addr":"广东省深圳市南山区西丽街道丽水路深圳大学城北大校区","lat":22.592377,"lng":113.976997,"conf":"高","status":"办学中","desc":"北大深圳研究生院，大学城园区","src":"官网 + OSM"},{"id":6,"name":"深圳职业技术大学","cat":"高职院校","addr":"广东省深圳市南山区留仙大道7098号","lat":22.584865,"lng":113.937969,"conf":"高","status":"办学中","desc":"2023年升格的职业本科大学","src":"官网 + OSM"},{"id":7,"name":"香港中文大学（深圳）","cat":"中外合作","addr":"广东省深圳市龙岗区龙翔大道2001号","lat":22.688259,"lng":114.21226,"conf":"高","status":"办学中","desc":"内地与香港合作办学的综合性大学","src":"官网 + OSM"},{"id":8,"name":"深圳北理莫斯科大学","cat":"中外合作","addr":"广东省深圳市龙岗区国际大学园路1号","lat":22.679116,"lng":114.205247,"conf":"高","status":"办学中","desc":"中俄合作举办的理工类大学","src":"官网 + OSM"},{"id":9,"name":"深圳信息职业技术学院","cat":"高职院校","addr":"广东省深圳市龙岗区龙翔大道2188号","lat":22.684998,"lng":114.21533,"conf":"高","status":"办学中","desc":"公办信息技术类高职院校","src":"官网 + OSM"},{"id":10,"name":"深圳技术大学","cat":"本地高校","addr":"广东省深圳市坪山区兰田路3002号","lat":22.700325,"lng":114.400255,"conf":"高","status":"办学中","desc":"2018年独立招生的应用技术型大学","src":"官网 + OSM"},{"id":11,"name":"中山大学深圳校区","cat":"异地校区","addr":"广东省深圳市光明区公常路66号","lat":22.8003,"lng":113.952608,"conf":"高","status":"办学中","desc":"中山大学医学工科新校区","src":"官网 + OSM"},{"id":12,"name":"深圳理工大学","cat":"本地高校","addr":"广东省深圳市光明区新湖街道北圳路1号","lat":22.800495,"lng":113.968499,"conf":"高","status":"办学中","desc":"依托中科院深圳先进院建设的新型研究型大学","src":"官网 + OSM"},{"id":13,"name":"暨南大学深圳校区","cat":"异地校区","addr":"广东省深圳市南山区侨城东街6号","lat":22.536603,"lng":113.990861,"conf":"中","status":"办学中","desc":"暨南大学深圳校区（旅游学院）","src":"官网 + 地图平台"}]</script>
+<!-- ===== DATA_INJECT_END ===== -->
+
+<script>
+// ===== UI STRINGS — replace ALL values with the user's chosen language =====
+const UI = {
+  title: "深圳市高校分布图 · 逐点精标",
+  subtitle: "按真实地址逐一标注 · 交叉核实 · 无遗漏无冗余",
+  asofLabel: "数据采集日期",
+  rankedByLabel: "排序口径",
+  catDefLabel: "收录边界",
+  total: "高校总数",
+  fitAll: "适配全图",
+  exportCSV: "导出 CSV",
+  searchPlaceholder: "搜索名称 / 地址 / 类别...",
+  listTitle: "高校列表",
+  legendTitle: "图例",
+  note: "注：香港大学（深圳）选址南山区西丽石壁龙片区，在建、无确定校址，未上图；天津大学佐治亚理工深圳学院已停止招生，未上图。来源：各校官网，坐标由 OSM / 维基百科（WGS-84）转换为 GCJ-02。",
+  addr: "地址",
+  coord: "坐标",
+  status: "状态",
+  src: "来源",
+  desc: "简介",
+  tileLang: "zh_cn"   // "zh_cn" for Chinese street labels, "en" for English
+};
+
+// ===== META — capture date + selection basis, set at generation time =====
+// rankedBy: the metric used to order / truncate to "top N" (e.g. "规模 / 注册资本",
+//   "成立时间", "搜索热度"). catDef: the category inclusion rule (e.g. "含 MCU 与工控，不含纯软件外包").
+// Both MUST be filled for "top N" tasks so reruns are comparable; see SKILL.md Top-N rule.
+const META = { asof: "2026-09-19", rankedBy: "全量收录，无排序", catDef: "在深圳设有实体校区并开展学历教育的高校（含高职院校；不含已停止招生机构与尚无确定校址的在建项目）" };
+
+// ===== HTML escaping — all data strings go through esc() before innerHTML =====
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Warning rule (documented in SKILL.md): conf of 低/Low, or an explicit ⚠ prefix.
+function isWarn(conf){ return /^⚠/.test(conf) || /^(低|low)$/i.test(conf.trim()); }
+
+document.getElementById('ui-title').textContent = UI.title;
+document.getElementById('ui-sub').textContent = UI.subtitle;
+document.getElementById('ui-asof').textContent = UI.asofLabel + ': ' + META.asof;
+const rbEl = document.getElementById('ui-rankedby');
+if (META.rankedBy) { rbEl.style.display = ''; rbEl.textContent = UI.rankedByLabel + ': ' + META.rankedBy; }
+const cdEl = document.getElementById('ui-catdef');
+if (META.catDef) { cdEl.style.display = ''; cdEl.textContent = UI.catDefLabel + ': ' + META.catDef; }
+document.getElementById('ui-total').textContent = UI.total;
+document.getElementById('ui-fitall').textContent = UI.fitAll;
+document.getElementById('ui-export').textContent = UI.exportCSV;
+document.getElementById('search').placeholder = UI.searchPlaceholder;
+document.getElementById('ui-listtitle').textContent = UI.listTitle;
+document.getElementById('ui-note').textContent = UI.note;
+
+const places = JSON.parse(document.getElementById('places-data').textContent);
+
+// --- Category color palette (auto-assigned by first appearance) ---
+const PALETTE = ['#1e40af','#dc2626','#059669','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#4f46e5'];
+const catColor = {};
+let colorIdx = 0;
+function colorFor(cat){
+  if(!(cat in catColor)){ catColor[cat] = PALETTE[colorIdx % PALETTE.length]; colorIdx++; }
+  return catColor[cat];
+}
+
+const map = L.map('map', { zoomControl: true });
+// Auto-center: fit to data bounds; fallback to a world view if empty.
+const allBounds = L.latLngBounds(places.map(c => [c.lat, c.lng]));
+if(places.length){ map.fitBounds(allBounds.pad(0.1)); } else { map.setView([20,0], 2); }
+
+// Amap tiles (GCJ-02). Unofficial public endpoint — if the background is blank, this URL may be dead/throttled.
+L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=' + UI.tileLang + '&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+  subdomains: '1234', maxZoom: 19, attribution: '© Amap'
+}).addTo(map);
+
+function makePin(num, color){
+  return L.divIcon({ className:'', html:`<div class="pin" style="background:${color}"><span>${num}</span></div>`, iconSize:[26,26], iconAnchor:[13,26] });
+}
+
+const markers = {};
+const listItems = [];
+
+places.forEach(c => {
+  const col = colorFor(c.cat);
+  const warn = isWarn(c.conf);
+  const m = L.marker([c.lat, c.lng], { icon: makePin(c.id, col) }).addTo(map);
+  let metaHtml = `${esc(UI.addr)}: ${esc(c.addr)}<br>${esc(UI.coord)}: ${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
+  if(c.status) metaHtml += `<br>${esc(UI.status)}: ${esc(c.status)}`;
+  if(c.src) metaHtml += `<br>${esc(UI.src)}: ${esc(c.src)}`;
+  const descHtml = c.desc ? `<div class="desc">${esc(c.desc)}</div>` : '';
+  m.bindPopup(`<div class="pop"><b>#${c.id} ${esc(c.name)}</b> <span style="font-size:11px;color:#555">[${esc(c.cat)}]</span>
+    ${descHtml}
+    <div class="meta">${metaHtml}</div>
+    <div class="conf ${warn ? 'warn' : ''}">${esc(c.conf)}</div></div>`);
+  markers[c.id] = m;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'item';
+  wrap.dataset.text = (c.name + ' ' + c.cat + ' ' + c.addr + ' ' + (c.desc || '')).toLowerCase();
+  const statusTag = c.status ? `<span class="tag status">${esc(c.status)}</span>` : '';
+  const descLine = c.desc ? `<div class="dsc">${esc(c.desc)}</div>` : '';
+  wrap.innerHTML = `<div class="num" style="background:${col}">${c.id}</div>
+    <div><div class="nm">${esc(c.name)}<span class="ct">${esc(c.cat)}</span></div><div class="ad">${esc(c.addr)}</div>
+    ${descLine}
+    <span class="tag ${warn ? 'warn' : ''}">${esc(c.conf)}</span>${statusTag}</div>`;
+  wrap.onclick = () => { map.flyTo([c.lat, c.lng], 16); m.openPopup(); };
+  document.getElementById('list').appendChild(wrap);
+  listItems.push(wrap);
+});
+
+document.getElementById('cTot').textContent = places.length;
+
+// --- Legend (only if >1 category) ---
+const legendEl = document.getElementById('legend');
+const cats = Object.keys(catColor);
+if(cats.length > 1){
+  let html = `<div style="font-weight:600;margin-bottom:4px">${esc(UI.legendTitle)}</div>`;
+  cats.forEach(c => { html += `<div class="row"><span class="dot" style="background:${catColor[c]}"></span> ${esc(c)}</div>`; });
+  legendEl.innerHTML = html;
+}
+
+// --- Search filter ---
+function filterList(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  listItems.forEach(el => { el.classList.toggle('hidden', q && !el.dataset.text.includes(q)); });
+}
+
+// --- Fit all ---
+function fitAll(){ if(places.length) map.fitBounds(allBounds.pad(0.1)); }
+
+// --- Export CSV ---
+function exportCSV(){
+  const rows = [['id','name','category','address','lat','lng','confidence','status','source','desc']];
+  places.forEach(c => rows.push([c.id, c.name, c.cat, c.addr, c.lat, c.lng, c.conf, c.status || '', c.src || '', c.desc || '']));
+  const csv = rows.map(r => r.map(f => `"${String(f).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (UI.title.replace(/[{}]/g,'') || 'places') + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

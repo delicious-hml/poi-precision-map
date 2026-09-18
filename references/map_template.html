@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{region} {category} Precision Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif; background:#0e1116; color:#e6e6e6; }
+  #app { display: flex; height: 100vh; }
+  #map { flex: 1; height: 100%; background:#1a1f27; }
+  #panel { width: 340px; min-width: 340px; height: 100%; overflow-y: auto; background:#151a22; border-left: 1px solid #2a3441; }
+  .hdr { padding: 14px 16px 10px; border-bottom: 1px solid #2a3441; }
+  .hdr h1 { font-size: 16px; margin: 0 0 6px; color:#fff; }
+  .hdr .sub { font-size: 12px; color:#9aa7b5; line-height: 1.5; }
+  .hdr .asof { font-size: 11px; color:#7e8a98; margin-top: 4px; }
+  .counts { display:flex; gap:8px; margin-top:10px; }
+  .chip { flex:1; text-align:center; border-radius:8px; padding:8px 4px; font-size:12px; background:rgba(30,64,175,.18); color:#9cc0ff; border:1px solid #1e40af; }
+  .chip b { display:block; font-size:20px; margin-bottom:2px; }
+  .btns { display:flex; gap:6px; padding:10px 16px; flex-wrap:wrap; border-bottom:1px solid #2a3441; }
+  .btns button { flex:1; min-width:80px; cursor:pointer; background:#1f2733; color:#cdd6e0; border:1px solid #34404f; border-radius:6px; padding:7px 4px; font-size:12px; }
+  .btns button:hover { background:#283242; }
+  .search { padding:10px 16px 0; }
+  .search input { width:100%; background:#1f2733; color:#e6e6e6; border:1px solid #34404f; border-radius:6px; padding:7px 10px; font-size:12px; outline:none; }
+  .search input:focus { border-color:#1e40af; }
+  .grp-title { padding:10px 16px 4px; font-size:12px; color:#9aa7b5; font-weight:600; }
+  .item { padding:9px 16px; border-bottom:1px solid #202833; cursor:pointer; display:flex; gap:10px; align-items:flex-start; }
+  .item:hover { background:#1c2430; }
+  .item.hidden { display:none; }
+  .num { flex:none; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; }
+  .nm { font-size:13px; color:#eef2f6; font-weight:600; }
+  .ct { font-size:10px; color:#9cc0ff; margin-left:6px; }
+  .ad { font-size:11px; color:#9aa7b5; line-height:1.45; margin-top:2px; }
+  .dsc { font-size:11px; color:#c2ccd8; line-height:1.45; margin-top:3px; }
+  .tag { font-size:10px; margin-top:3px; display:inline-block; padding:1px 6px; border-radius:4px; background:rgba(46,125,50,.2); color:#7fd18a; }
+  .tag.warn { background:rgba(255,107,53,.2); color:#ff9b6b; }
+  .tag.status { background:rgba(9,105,218,.18); color:#79b8ff; margin-left:4px; }
+  .legend { padding:10px 16px; font-size:11px; color:#9aa7b5; border-top:1px solid #2a3441; }
+  .legend .row { display:flex; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap; }
+  .dot { width:12px; height:12px; border-radius:50%; flex:none; }
+  .pin { font-size: 11px; font-weight:700; color:#fff; width:26px; height:26px; line-height:22px; text-align:center; border-radius:50% 50% 50% 0; transform: rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.5); }
+  .pin span { transform: rotate(45deg); display:inline-block; }
+  .pop b { font-size:14px; color:#111; }
+  .pop .desc { font-size:12px; color:#444; margin:4px 0 0; line-height:1.5; }
+  .pop .meta { font-size:12px; color:#333; margin-top:4px; line-height:1.5; }
+  .pop .conf { font-size:11px; margin-top:6px; padding:3px 6px; border-radius:4px; display:inline-block; background:#e6f4ea; color:#1b5e20; }
+  .pop .conf.warn { background:#fdeede; color:#b34700; }
+  .note { padding:10px 16px; font-size:11px; color:#7e8a98; line-height:1.6; border-top:1px solid #2a3441; }
+  @media (max-width: 640px){
+    #app { flex-direction: column; }
+    #panel { width:100%; min-width:0; max-height:45vh; border-left:none; border-top:1px solid #2a3441; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+  <div id="panel">
+    <div class="hdr">
+      <h1 id="ui-title">{region} {category} Precision Map</h1>
+      <div class="sub" id="ui-sub">Point-by-point by actual address. Rigorous counting: no omissions, no redundancy.</div>
+      <div class="asof" id="ui-asof"></div>
+      <div class="asof" id="ui-rankedby" style="display:none"></div>
+      <div class="asof" id="ui-catdef" style="display:none"></div>
+      <div class="counts">
+        <div class="chip"><b id="cTot">0</b><span id="ui-total">Total</span></div>
+      </div>
+    </div>
+    <div class="btns">
+      <button id="ui-fitall" onclick="fitAll()">Fit All</button>
+      <button id="ui-export" onclick="exportCSV()">Export CSV</button>
+    </div>
+    <div class="search"><input id="search" type="text" placeholder="Search name / address / category..." oninput="filterList()" /></div>
+    <div class="grp-title" id="ui-listtitle">Places</div>
+    <div id="list"></div>
+    <div class="legend" id="legend"></div>
+    <div class="note" id="ui-note">Sources: category-specific authoritative sources, cross-verified. Coordinates are GCJ-02; co-located places nudged to avoid overlap.</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- ===== DATA_INJECT_START — replace with REAL verified data only. NO placeholders, NO demos. =====
+     Rules (see SKILL.md "Template Discipline"):
+     - Do NOT rewrite this HTML file's structure. Only replace: (a) the UI strings object below,
+       (b) META.asof, (c) the contents of this <script> block. Feature gaps go in an extension
+       block AFTER the existing script — never delete or rewrite the popup/list/legend logic.
+     - Standard JSON (double-quoted keys). Fields: id (int), name, cat, addr, lat, lng, conf.
+       Optional: desc (one-line intro shown in popup + side list), status (营业中/已关闭/在建...), src (source label).
+     - conf closed set: 高 / 中 / 低 (or High / Medium / Low). 低/Low renders as warning. Optional ⚠ prefix.
+     - lat/lng MUST be GCJ-02 coordinates (Amap tiles). Convert WGS-84 / BD-09 first.
+     - Points that could not be precisely geocoded do NOT go in this array; list them in the delivery note instead.
+     - Set META.asof to the data capture date (YYYY-MM-DD).
+     - For "top N" tasks, ALSO set META.rankedBy (the ordering metric, e.g. "规模/注册资本")
+       and META.catDef (the category inclusion rule, e.g. "含 MCU 与工控，不含纯软件外包").
+       These render in the header so two runs with the same spec stay comparable. Do not leave sample rows.
+     - The popup template below references UI.addr / UI.coord / UI.status / UI.src and c.conf.
+       These placeholders are FROZEN — removing any of them silently drops a required field and
+       will be flagged by validate.py. Empty values render as blank lines, that is fine. -->
+<script id="places-data" type="application/json">[]</script>
+<!-- ===== DATA_INJECT_END ===== -->
+
+<script>
+// ===== UI STRINGS — replace ALL values with the user's chosen language =====
+const UI = {
+  title: "{region} {category} Precision Map",
+  subtitle: "Point-by-point by actual address. Rigorous counting: no omissions, no redundancy.",
+  asofLabel: "Data as of",
+  rankedByLabel: "Ranked by",
+  catDefLabel: "Inclusion",
+  total: "Total",
+  fitAll: "Fit All",
+  exportCSV: "Export CSV",
+  searchPlaceholder: "Search name / address / category...",
+  listTitle: "Places",
+  legendTitle: "Legend",
+  note: "Sources: category-specific authoritative sources, cross-verified. Coordinates are GCJ-02; co-located places nudged to avoid overlap.",
+  addr: "Address",
+  coord: "Coordinates",
+  status: "Status",
+  src: "Source",
+  desc: "About",
+  tileLang: "zh_cn"   // "zh_cn" for Chinese street labels, "en" for English
+};
+
+// ===== META — capture date + selection basis, set at generation time =====
+// rankedBy: the metric used to order / truncate to "top N" (e.g. "规模 / 注册资本",
+//   "成立时间", "搜索热度"). catDef: the category inclusion rule (e.g. "含 MCU 与工控，不含纯软件外包").
+// Both MUST be filled for "top N" tasks so reruns are comparable; see SKILL.md Top-N rule.
+const META = { asof: "YYYY-MM-DD", rankedBy: "", catDef: "" };
+
+// ===== HTML escaping — all data strings go through esc() before innerHTML =====
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Warning rule (documented in SKILL.md): conf of 低/Low, or an explicit ⚠ prefix.
+function isWarn(conf){ return /^⚠/.test(conf) || /^(低|low)$/i.test(conf.trim()); }
+
+document.getElementById('ui-title').textContent = UI.title;
+document.getElementById('ui-sub').textContent = UI.subtitle;
+document.getElementById('ui-asof').textContent = UI.asofLabel + ': ' + META.asof;
+const rbEl = document.getElementById('ui-rankedby');
+if (META.rankedBy) { rbEl.style.display = ''; rbEl.textContent = UI.rankedByLabel + ': ' + META.rankedBy; }
+const cdEl = document.getElementById('ui-catdef');
+if (META.catDef) { cdEl.style.display = ''; cdEl.textContent = UI.catDefLabel + ': ' + META.catDef; }
+document.getElementById('ui-total').textContent = UI.total;
+document.getElementById('ui-fitall').textContent = UI.fitAll;
+document.getElementById('ui-export').textContent = UI.exportCSV;
+document.getElementById('search').placeholder = UI.searchPlaceholder;
+document.getElementById('ui-listtitle').textContent = UI.listTitle;
+document.getElementById('ui-note').textContent = UI.note;
+
+const places = JSON.parse(document.getElementById('places-data').textContent);
+
+// --- Category color palette (auto-assigned by first appearance) ---
+const PALETTE = ['#1e40af','#dc2626','#059669','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#4f46e5'];
+const catColor = {};
+let colorIdx = 0;
+function colorFor(cat){
+  if(!(cat in catColor)){ catColor[cat] = PALETTE[colorIdx % PALETTE.length]; colorIdx++; }
+  return catColor[cat];
+}
+
+const map = L.map('map', { zoomControl: true });
+// Auto-center: fit to data bounds; fallback to a world view if empty.
+const allBounds = L.latLngBounds(places.map(c => [c.lat, c.lng]));
+if(places.length){ map.fitBounds(allBounds.pad(0.1)); } else { map.setView([20,0], 2); }
+
+// Amap tiles (GCJ-02). Unofficial public endpoint — if the background is blank, this URL may be dead/throttled.
+L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=' + UI.tileLang + '&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+  subdomains: '1234', maxZoom: 19, attribution: '© Amap'
+}).addTo(map);
+
+function makePin(num, color){
+  return L.divIcon({ className:'', html:`<div class="pin" style="background:${color}"><span>${num}</span></div>`, iconSize:[26,26], iconAnchor:[13,26] });
+}
+
+const markers = {};
+const listItems = [];
+
+places.forEach(c => {
+  const col = colorFor(c.cat);
+  const warn = isWarn(c.conf);
+  const m = L.marker([c.lat, c.lng], { icon: makePin(c.id, col) }).addTo(map);
+  let metaHtml = `${esc(UI.addr)}: ${esc(c.addr)}<br>${esc(UI.coord)}: ${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
+  if(c.status) metaHtml += `<br>${esc(UI.status)}: ${esc(c.status)}`;
+  if(c.src) metaHtml += `<br>${esc(UI.src)}: ${esc(c.src)}`;
+  const descHtml = c.desc ? `<div class="desc">${esc(c.desc)}</div>` : '';
+  m.bindPopup(`<div class="pop"><b>#${c.id} ${esc(c.name)}</b> <span style="font-size:11px;color:#555">[${esc(c.cat)}]</span>
+    ${descHtml}
+    <div class="meta">${metaHtml}</div>
+    <div class="conf ${warn ? 'warn' : ''}">${esc(c.conf)}</div></div>`);
+  markers[c.id] = m;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'item';
+  wrap.dataset.text = (c.name + ' ' + c.cat + ' ' + c.addr + ' ' + (c.desc || '')).toLowerCase();
+  const statusTag = c.status ? `<span class="tag status">${esc(c.status)}</span>` : '';
+  const descLine = c.desc ? `<div class="dsc">${esc(c.desc)}</div>` : '';
+  wrap.innerHTML = `<div class="num" style="background:${col}">${c.id}</div>
+    <div><div class="nm">${esc(c.name)}<span class="ct">${esc(c.cat)}</span></div><div class="ad">${esc(c.addr)}</div>
+    ${descLine}
+    <span class="tag ${warn ? 'warn' : ''}">${esc(c.conf)}</span>${statusTag}</div>`;
+  wrap.onclick = () => { map.flyTo([c.lat, c.lng], 16); m.openPopup(); };
+  document.getElementById('list').appendChild(wrap);
+  listItems.push(wrap);
+});
+
+document.getElementById('cTot').textContent = places.length;
+
+// --- Legend (only if >1 category) ---
+const legendEl = document.getElementById('legend');
+const cats = Object.keys(catColor);
+if(cats.length > 1){
+  let html = `<div style="font-weight:600;margin-bottom:4px">${esc(UI.legendTitle)}</div>`;
+  cats.forEach(c => { html += `<div class="row"><span class="dot" style="background:${catColor[c]}"></span> ${esc(c)}</div>`; });
+  legendEl.innerHTML = html;
+}
+
+// --- Search filter ---
+function filterList(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  listItems.forEach(el => { el.classList.toggle('hidden', q && !el.dataset.text.includes(q)); });
+}
+
+// --- Fit all ---
+function fitAll(){ if(places.length) map.fitBounds(allBounds.pad(0.1)); }
+
+// --- Export CSV ---
+function exportCSV(){
+  const rows = [['id','name','category','address','lat','lng','confidence','status','source','desc']];
+  places.forEach(c => rows.push([c.id, c.name, c.cat, c.addr, c.lat, c.lng, c.conf, c.status || '', c.src || '', c.desc || '']));
+  const csv = rows.map(r => r.map(f => `"${String(f).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (UI.title.replace(/[{}]/g,'') || 'places') + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>
