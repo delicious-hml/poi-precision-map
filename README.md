@@ -7,7 +7,7 @@
 [![API key](https://img.shields.io/badge/API%20keys-none%20required-success.svg)](#why-no-keys)
 [![Coordinates](https://img.shields.io/badge/coordinates-GCJ--02%20discipline-red.svg)](#coordinate-system-rule)
 
-**[中文说明](README.zh-CN.md)** · [Live example map](examples/shenzhen-universities.html) · [Skill spec (SKILL.md)](SKILL.md)
+**[中文说明](README.zh-CN.md)** · [▶ Live demo map](https://delicious-hml.github.io/poi-precision-map/examples/shenzhen-universities.html) · [Skill spec (SKILL.md)](SKILL.md)
 
 ---
 
@@ -17,7 +17,7 @@ An **Agent Skill** (drop-in `SKILL.md` + templates, compatible with Claude Code,
 
 > *"标出深圳所有的大学，一家家精确到地址"* → a single self-contained HTML file with every university individually geocoded, numbered, labeled with confidence and source, cross-verified, and validated by script before delivery.
 
-The demo map below was generated with this skill — download and open it locally, it just works:
+The demo map below was generated with this skill — [open it live](https://delicious-hml.github.io/poi-precision-map/examples/shenzhen-universities.html) or download [`examples/shenzhen-universities.html`](examples/shenzhen-universities.html) and double-click it; it just works:
 
 | | |
 |---|---|

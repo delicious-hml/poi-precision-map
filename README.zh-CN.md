@@ -7,7 +7,7 @@
 [![免密钥](https://img.shields.io/badge/API%20%E5%AF%86%E9%92%A5-%E4%B8%8D%E9%9C%80%E8%A6%81-success.svg)](#为什么不需要密钥)
 [![坐标系](https://img.shields.io/badge/%E5%9D%90%E6%A0%87-GCJ--02%20%E9%93%81%E5%BE%8B-red.svg)](#坐标系铁律)
 
-**[English](README.md)** · [示例地图：深圳高校分布](examples/shenzhen-universities.html) · [Skill 规范（SKILL.md）](SKILL.md)
+**[English](README.md)** · [▶ 在线示例：深圳高校分布图](https://delicious-hml.github.io/poi-precision-map/examples/shenzhen-universities.html) · [Skill 规范（SKILL.md）](SKILL.md)
 
 ---
 
@@ -20,7 +20,7 @@
 | | |
 |---|---|
 | **输入** | 「把深圳所有高校一家家标到地图上」 |
-| **输出** | [`examples/shenzhen-universities.html`](examples/shenzhen-universities.html) —— 13 个编号坐标点、4 个分类图例，每点含地址、GCJ-02 坐标、办学状态、置信度、来源；侧边列表可搜索、可一键导出 CSV、`file://` 双击即开。另有 2 所高校**未上图、只在交付说明中列明**（1 所在建无确定校址、1 所已停止招生）——这正是 skill「零编造」规则的体现。 |
+| **输出** | [`examples/shenzhen-universities.html`](examples/shenzhen-universities.html)（[在线打开](https://delicious-hml.github.io/poi-precision-map/examples/shenzhen-universities.html)）—— 13 个编号坐标点、4 个分类图例，每点含地址、GCJ-02 坐标、办学状态、置信度、来源；侧边列表可搜索、可一键导出 CSV、`file://` 双击即开。另有 2 所高校**未上图、只在交付说明中列明**（1 所在建无确定校址、1 所已停止招生）——这正是 skill「零编造」规则的体现。 |
 
 ## 为什么会有这个 Skill（真实翻车现场）
 
